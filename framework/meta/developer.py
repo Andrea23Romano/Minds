@@ -1,3 +1,4 @@
+from typing import Dict
 from ..core.base_agent import BaseAgent
 
 class DeveloperAgent(BaseAgent):

@@ -1,4 +1,5 @@
 import json
+from typing import Dict
 from ..core.base_agent import BaseAgent
 from ..integrations.llm import invoke_architect_for_goal_change, invoke_architect_for_improvement
 
