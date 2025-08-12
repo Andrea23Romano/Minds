@@ -25,19 +25,33 @@ st.set_page_config(page_title="Agentic Mesh Interface", layout="wide")
 st.title("🤖 Human-Mesh Interface")
 st.caption("Observe and interact with a live, self-improving agentic mesh.")
 
+
+# --- Logging Configuration ---
+# This needs to be done once per session, and before the log handler is used.
+if "logging_configured" not in st.session_state:
+    logging.basicConfig(
+        level=logging.INFO,
+        handlers=[
+            StreamlitLogHandler(),
+            logging.StreamHandler() # This logs to the console
+        ],
+        force=True,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    st.session_state.logging_configured = True
+
+
 # --- UI Components ---
 class StreamlitLogHandler(logging.Handler):
-    """Custom logging handler to display logs in a Streamlit placeholder."""
-    def __init__(self, placeholder):
+    """Custom logging handler to append logs to the session state."""
+    def __init__(self):
         super().__init__()
-        self.placeholder = placeholder
         if "logs" not in st.session_state:
             st.session_state.logs = []
 
     def emit(self, record):
+        # Only append the formatted log to the list in session state
         st.session_state.logs.append(self.format(record))
-        log_str = "\n".join(st.session_state.logs)
-        self.placeholder.code(log_str, language="log")
 
 def generate_graphviz(kernel: MeshKernel) -> str:
     """Generates a Graphviz DOT language string to visualize the mesh."""
@@ -162,21 +176,18 @@ if st.session_state.simulation_running:
 
         st.subheader("Real-time Logs")
         log_placeholder = st.empty()
-        # Set up logging to go to both the Streamlit UI and the console
-        logging.basicConfig(
-            level=logging.INFO,
-            handlers=[
-                StreamlitLogHandler(log_placeholder),
-                logging.StreamHandler() # This logs to the console
-            ],
-            force=True,
-            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        )
 
     # The main loop for live updates
     while st.session_state.simulation_running:
+        # Update graph
         dot_string = generate_graphviz(st.session_state.kernel)
         graph_placeholder.graphviz_chart(dot_string)
+
+        # Update logs from session state
+        if "logs" in st.session_state and st.session_state.logs:
+            log_str = "\n".join(st.session_state.logs)
+            log_placeholder.code(log_str, language="log")
+
         time.sleep(1.5)
         st.rerun()
 else:
