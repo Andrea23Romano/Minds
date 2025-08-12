@@ -162,7 +162,16 @@ if st.session_state.simulation_running:
 
         st.subheader("Real-time Logs")
         log_placeholder = st.empty()
-        logging.basicConfig(level=logging.INFO, handlers=[StreamlitLogHandler(log_placeholder)], force=True)
+        # Set up logging to go to both the Streamlit UI and the console
+        logging.basicConfig(
+            level=logging.INFO,
+            handlers=[
+                StreamlitLogHandler(log_placeholder),
+                logging.StreamHandler() # This logs to the console
+            ],
+            force=True,
+            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        )
 
     # The main loop for live updates
     while st.session_state.simulation_running:

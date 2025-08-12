@@ -5,10 +5,16 @@ from ..integrations.llm import invoke_agent_llm
 
 class HumanInterfaceAgent(BaseAgent):
     async def think(self, message: Dict[str, Any]):
-        new_goal = message.get("content", {}).get("new_goal_description")
+        content = message.get("content", {})
+        new_goal = content.get("new_goal_description")
+
         if new_goal:
             self.logger.info(f"Received new goal from human user: '{new_goal}'")
             await self.send_message("architect", {"type": "SET_NEW_GOAL", "goal": new_goal})
+        else:
+            self.logger.warning(
+                f"Received message I don't know how to handle: {json.dumps(content)}"
+            )
 class LLMAgent(BaseAgent):
     def __init__(self, kernel: 'Kernel', agent_id: str, prompt: str):
         super().__init__(kernel, agent_id)
