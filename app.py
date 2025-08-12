@@ -5,9 +5,22 @@ live graph visualization and interactive mission control panel.
 import asyncio
 import logging
 import time
+import threading
 from typing import Dict, Callable
 
 import streamlit as st
+
+# --- asyncio/thread management ---
+# This class manages a long-running asyncio event loop in a background thread.
+# This is necessary to run the agent tasks independently of the Streamlit script execution.
+class BackgroundEventLoop(threading.Thread):
+    def __init__(self):
+        super().__init__(daemon=True)
+        self.loop = asyncio.new_event_loop()
+
+    def run(self):
+        asyncio.set_event_loop(self.loop)
+        self.loop.run_forever()
 
 # --- Framework Imports ---
 from framework.core.kernel import MeshKernel
@@ -95,6 +108,14 @@ def create_agent_from_config(kernel: MeshKernel, agent_config: Dict) -> 'BaseAge
 def initialize_simulation(task_spec: Dict):
     """Sets up the kernel and agents, storing them in the session state."""
     st.session_state.logs = []
+
+    # Get or create the background event loop thread
+    if "bg_loop" not in st.session_state:
+        logging.info("Starting background event loop thread.")
+        st.session_state.bg_loop = BackgroundEventLoop()
+        st.session_state.bg_loop.start()
+
+    bg_loop = st.session_state.bg_loop
     kernel = MeshKernel()
 
     # Add the human interface agent first
@@ -111,8 +132,11 @@ def initialize_simulation(task_spec: Dict):
     kernel.register_agent(DeveloperAgent(kernel, "developer"))
     kernel.register_agent(DeploymentAgent(kernel, "deployment", agent_factory=create_agent_from_config))
 
-    # Start all agent tasks
-    asyncio.run(kernel.start(task_spec.get("kickstart_message")))
+    # Start all agent tasks in the background loop
+    asyncio.run_coroutine_threadsafe(
+        kernel.start(task_spec.get("kickstart_message")),
+        bg_loop.loop
+    )
 
     st.session_state.kernel = kernel
     st.session_state.simulation_running = True
@@ -166,10 +190,17 @@ if st.session_state.simulation_running:
             if new_goal and "kernel" in st.session_state:
                 kernel = st.session_state.kernel
                 interface_agent = kernel.agents.get("human_interface")
-                if interface_agent:
+                bg_loop = st.session_state.get("bg_loop")
+                if interface_agent and bg_loop:
                     message = {"content": {"new_goal_description": new_goal}}
-                    asyncio.run(interface_agent.inbox.put(message))
+                    # Submit the coroutine to the background event loop
+                    asyncio.run_coroutine_threadsafe(
+                        interface_agent.inbox.put(message),
+                        bg_loop.loop
+                    )
                     st.toast("New goal submitted to the mesh!")
+                elif not bg_loop:
+                    st.error("Background event loop is not running.")
             else:
                 st.warning("Please enter a goal.")
 
