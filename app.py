@@ -26,6 +26,18 @@ st.title("🤖 Human-Mesh Interface")
 st.caption("Observe and interact with a live, self-improving agentic mesh.")
 
 
+# --- UI Components ---
+class StreamlitLogHandler(logging.Handler):
+    """Custom logging handler to append logs to the session state."""
+    def __init__(self):
+        super().__init__()
+        if "logs" not in st.session_state:
+            st.session_state.logs = []
+
+    def emit(self, record):
+        # Only append the formatted log to the list in session state
+        st.session_state.logs.append(self.format(record))
+
 # --- Logging Configuration ---
 # This needs to be done once per session, and before the log handler is used.
 if "logging_configured" not in st.session_state:
@@ -39,19 +51,6 @@ if "logging_configured" not in st.session_state:
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
     st.session_state.logging_configured = True
-
-
-# --- UI Components ---
-class StreamlitLogHandler(logging.Handler):
-    """Custom logging handler to append logs to the session state."""
-    def __init__(self):
-        super().__init__()
-        if "logs" not in st.session_state:
-            st.session_state.logs = []
-
-    def emit(self, record):
-        # Only append the formatted log to the list in session state
-        st.session_state.logs.append(self.format(record))
 
 def generate_graphviz(kernel: MeshKernel) -> str:
     """Generates a Graphviz DOT language string to visualize the mesh."""
