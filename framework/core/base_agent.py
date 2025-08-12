@@ -15,6 +15,8 @@ class BaseAgent(ABC):
         while True:
             try:
                 message = await self.inbox.get()
+                sender_id = message.get("sender_id", "kernel")
+                self.logger.info(f"Received message from '{sender_id}'. Processing...")
                 await self.think(message)
                 self.inbox.task_done()
             except asyncio.CancelledError:

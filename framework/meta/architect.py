@@ -12,8 +12,12 @@ class ArchitectAgent(BaseAgent):
         msg_type = content.get('type')
         if msg_type == 'SET_NEW_GOAL':
             self.goal = content.get('goal')
+            self.logger.info(f"Adapting to new goal: '{self.goal}'")
             plan = await invoke_architect_for_goal_change(self.goal)
+            self.logger.info(f"Generated plan for new goal: {json.dumps(plan)}")
             await self.send_message("developer", {"type": "EXECUTE_PLAN", "plan": plan})
         elif msg_type == 'FITNESS_REPORT' and content['score'] < 0.99:
+            self.logger.info(f"Fitness score {content['score']:.4f} is below threshold. Generating improvement plan.")
             plan = await invoke_architect_for_improvement(self.goal, content['score'], content['agent_context'])
+            self.logger.info(f"Generated improvement plan: {json.dumps(plan)}")
             await self.send_message("developer", {"type": "EXECUTE_PLAN", "plan": plan})

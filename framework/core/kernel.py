@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import json
 from typing import Dict, Any
 
 class MeshKernel:
@@ -33,8 +34,14 @@ class MeshKernel:
             self.logger.info(f"Updating prompt for agent '{agent_id}'.")
             agent.prompt = new_prompt
     async def route_message(self, sender_id: str, target_id: str, content: Any):
+        self.logger.info(
+            f"Routing message from '{sender_id}' to '{target_id}'. Content: {json.dumps(content)}"
+        )
         target_agent = self.agents.get(target_id)
-        if target_agent: await target_agent.inbox.put({"sender_id": sender_id, "content": content})
+        if target_agent:
+            await target_agent.inbox.put({"sender_id": sender_id, "content": content})
+        else:
+            self.logger.warning(f"Could not route message: Target agent '{target_id}' not found.")
     async def log_metric(self, agent_id: str, metric: Dict[str, Any]):
         await self.metrics_bus.put({"agent_id": agent_id, "metric": metric})
     async def start(self, kickstart_message: Dict[str, Any] = None):
