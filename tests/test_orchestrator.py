@@ -4,13 +4,18 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from janus.orchestrator import AsyncLocalOrchestrator
+from janus.models import ChatMessage, Role
 
 
 @pytest.fixture
 def mock_agent():
     agent = MagicMock()
     agent.execute = AsyncMock(
-        return_value={"new_message": {"role": "assistant", "content": "Test response"}}
+        return_value={
+            "messages_to_add": [
+                ChatMessage(role=Role.ASSISTANT, content="Test response")
+            ]
+        }
     )
     return agent
 

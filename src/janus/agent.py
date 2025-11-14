@@ -2,10 +2,11 @@
 import json
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, Dict
+from typing import Any, Dict, List
 
-from janus.models import Message, Role
+from janus.models import ChatMessage, Role
 from janus.tool import ToolRegistry
+from openai import AsyncOpenAI
 
 logger = logging.getLogger(__name__)
 
@@ -27,18 +28,32 @@ class BaseAgent(ABC):
 
 class StandardPlannerAgent(BaseAgent):
     """
-    A simple planner agent that uses a mock LLM to call tools.
+    A simple planner agent that uses a live OpenAI client to call tools.
     """
 
-    MOCK_LLM_RESPONSE = '{"tool_name": "get_weather", "parameters": {"location": "SF"}}'
+    def __init__(self, api_key: str, system_prompt: str = "You are a helpful assistant."):
+        self.client = AsyncOpenAI(api_key=api_key)
+        self.system_prompt = ChatMessage(role=Role.SYSTEM, content=system_prompt)
 
-    async def _mock_llm_call(self, prompt: str) -> str:
+    async def _call_openai_api(
+        self, messages: List[Dict[str, Any]], tools: List[Dict[str, Any]]
+    ) -> ChatMessage:
         """
-        A mock LLM call that returns a hard-coded tool call.
+        Calls the OpenAI API with the given messages and tools.
         """
-        logger.info(f"Mock LLM call with prompt:\n{prompt}")
-        # In a real scenario, this would be a JSON object or similar
-        return self.MOCK_LLM_RESPONSE
+        formatted_messages = [self.system_prompt.model_dump()] + messages
+        response = await self.client.chat.completions.create(
+            model="gpt-4o",
+            messages=formatted_messages,
+            tools=tools,
+        )
+        response_message = response.choices[0].message
+        if response_message.tool_calls:
+            return ChatMessage(
+                role=Role.ASSISTANT,
+                tool_calls=response_message.tool_calls,
+            )
+        return ChatMessage(role=Role.ASSISTANT, content=response_message.content)
 
     async def execute(
         self, state: Dict[str, Any], tools: "ToolRegistry"
@@ -46,40 +61,33 @@ class StandardPlannerAgent(BaseAgent):
         """
         Executes a planning step: prompt -> LLM -> tool -> result.
         """
-        # 1. Render prompt
-        # A real implementation would use a templating engine
-        prompt = f"""
-Current state: {state}
-Available tools: {tools.get_schemas()}
-What is the next step?
-"""
-        # 2. Call mock LLM
-        llm_response_str = await self._mock_llm_call(prompt)
-
-        # 3. Parse LLM response
-        try:
-            llm_response = json.loads(llm_response_str)
-            tool_name = llm_response["tool_name"]
-            parameters = llm_response["parameters"]
-        except (json.JSONDecodeError, KeyError) as e:
-            logger.error(f"Failed to parse LLM response: {e}")
-            return {"error": str(e)}
-
-        # 4. Execute the tool
-        try:
-            tool_result = await tools.execute(tool_name, **parameters)
-            new_message = Message(
-                role=Role.ASSISTANT,
-                content=f"Tool {tool_name} executed successfully. Result: {tool_result}",
-            )
-        except Exception as e:
-            logger.error(f"Tool execution failed: {e}")
-            new_message = Message(
-                role=Role.ASSISTANT,
-                content=f"Error executing tool {tool_name}: {str(e)}",
-            )
-
-        # 5. Return new state
-        # In this simple case, we just append the result as a new message.
-        # A more complex agent might update state in other ways.
-        return {"new_message": new_message.model_dump()}
+        messages = state.get("messages", [])
+        tool_schemas = tools.get_schemas()
+        llm_response_message = await self._call_openai_api(messages, tool_schemas)
+        messages_to_add = [llm_response_message]
+        if llm_response_message.tool_calls:
+            for tool_call in llm_response_message.tool_calls:
+                tool_name = tool_call.function.name
+                try:
+                    tool_args = json.loads(tool_call.function.arguments)
+                    tool_result = await tools.execute(tool_name, **tool_args)
+                    messages_to_add.append(
+                        ChatMessage(role=Role.TOOL, content=str(tool_result))
+                    )
+                except json.JSONDecodeError as e:
+                    logger.error(f"Failed to parse tool arguments: {e}")
+                    messages_to_add.append(
+                        ChatMessage(
+                            role=Role.TOOL,
+                            content=f"Error parsing arguments for tool {tool_name}: {e}",
+                        )
+                    )
+                except Exception as e:
+                    logger.error(f"Tool execution failed: {e}")
+                    messages_to_add.append(
+                        ChatMessage(
+                            role=Role.TOOL,
+                            content=f"Error executing tool {tool_name}: {e}",
+                        )
+                    )
+        return {"messages_to_add": messages_to_add}

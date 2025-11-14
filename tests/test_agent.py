@@ -17,21 +17,25 @@ def mock_tool_registry():
 
 @pytest.fixture
 def agent():
-    return StandardPlannerAgent()
+    return StandardPlannerAgent(api_key="test-key")
 
 
 @pytest.mark.asyncio
-async def test_agent_execute(agent: StandardPlannerAgent, mock_tool_registry):
-    agent._mock_llm_call = AsyncMock(
-        return_value=json.dumps(
-            {"tool_name": "get_weather", "parameters": {"location": "SF"}}
+async def test__agent_execute(agent: StandardPlannerAgent, mock_tool_registry):
+    mock_function = MagicMock()
+    mock_function.name = "get_weather"
+    mock_function.arguments = json.dumps({"location": "SF"})
+    mock_tool_call = MagicMock()
+    mock_tool_call.function = mock_function
+    agent._call_openai_api = AsyncMock(
+        return_value=MagicMock(
+            tool_calls=[mock_tool_call]
         )
     )
     state = {"messages": [{"role": "user", "content": "What's the weather in SF?"}]}
     result = await agent.execute(state, mock_tool_registry)
-
-    assert result["new_message"]["role"] == "assistant"
-    assert "Result: Sunny" in result["new_message"]["content"]
+    assert result["messages_to_add"][1].role == "tool"
+    assert "Sunny" in result["messages_to_add"][1].content
     mock_tool_registry.execute.assert_awaited_once_with(
         "get_weather", location="SF"
     )
@@ -39,22 +43,36 @@ async def test_agent_execute(agent: StandardPlannerAgent, mock_tool_registry):
 
 @pytest.mark.asyncio
 async def test_agent_llm_parse_error(agent: StandardPlannerAgent, mock_tool_registry):
-    agent._mock_llm_call = AsyncMock(return_value="invalid json")
+    mock_function = MagicMock()
+    mock_function.name = "get_weather"
+    mock_function.arguments = "invalid json"
+    mock_tool_call = MagicMock()
+    mock_tool_call.function = mock_function
+    agent._call_openai_api = AsyncMock(
+        return_value=MagicMock(
+            tool_calls=[mock_tool_call]
+        )
+    )
     state = {"messages": []}
     result = await agent.execute(state, mock_tool_registry)
-    assert "error" in result
+    assert "Error parsing arguments" in result["messages_to_add"][1].content
 
 
 @pytest.mark.asyncio
 async def test_agent_tool_execution_error(
     agent: StandardPlannerAgent, mock_tool_registry
 ):
-    agent._mock_llm_call = AsyncMock(
-        return_value=json.dumps(
-            {"tool_name": "get_weather", "parameters": {"location": "SF"}}
+    mock_function = MagicMock()
+    mock_function.name = "get_weather"
+    mock_function.arguments = json.dumps({"location": "SF"})
+    mock_tool_call = MagicMock()
+    mock_tool_call.function = mock_function
+    agent._call_openai_api = AsyncMock(
+        return_value=MagicMock(
+            tool_calls=[mock_tool_call]
         )
     )
     mock_tool_registry.execute.side_effect = Exception("Tool failed")
     state = {"messages": []}
     result = await agent.execute(state, mock_tool_registry)
-    assert "Error executing tool" in result["new_message"]["content"]
+    assert "Error executing tool" in result["messages_to_add"][1].content
