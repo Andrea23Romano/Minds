@@ -66,9 +66,12 @@ class ToolRegistry:
             if schema:
                 schemas.append(
                     {
-                        "name": name,
-                        "description": func.__doc__ or "",
-                        "parameters": schema.model_json_schema(),
+                        "type": "function",
+                        "function": {
+                            "name": name,
+                            "description": func.__doc__ or "",
+                            "parameters": schema.model_json_schema(),
+                        },
                     }
                 )
         return schemas
