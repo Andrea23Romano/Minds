@@ -38,6 +38,34 @@ async def get_weather(location: str) -> str:
     # In a real scenario, this would call a weather API
     return f"The weather in {location} is sunny."
 
+
+async def run_orchestration(
+    api_key: str, memory: InMemoryWorkingMemory, user_prompt: str
+):
+    """
+    Sets up and runs the agent orchestration for a single turn.
+    """
+    # Initialize tools
+    tool_registry = ToolRegistry()
+    tool_registry.register(get_weather)
+
+    # Initialize agent and orchestrator
+    agent = StandardPlannerAgent(api_key=api_key)
+    orchestrator = AsyncLocalOrchestrator(
+        agent=agent,
+        tools=tool_registry,
+        memory=memory,
+    )
+
+    # Add the latest user message to memory
+    await memory.add(ChatMessage(role=Role.USER, content=user_prompt))
+
+    # Run the orchestrator. The agent will get the full message history from memory.
+    initial_state = {}
+    async for _ in orchestrator.run(initial_state):
+        pass
+
+
 # Streamlit UI
 st.set_page_config(layout="wide")
 st.title("Janus Agent Framework")
@@ -65,30 +93,8 @@ with col1:
                     st.session_state.memory = InMemoryWorkingMemory()
                 memory = st.session_state.memory
 
-                # Initialize tools
-                tool_registry = ToolRegistry()
-                tool_registry.register(get_weather)
-
-                # Initialize agent and orchestrator
-                agent = StandardPlannerAgent(api_key=api_key)
-                orchestrator = AsyncLocalOrchestrator(
-                    agent=agent,
-                    tools=tool_registry,
-                    memory=memory,
-                )
-
-                # Add user message to memory
-                async def run_orchestrator():
-                    await memory.add(
-                        ChatMessage(role=Role.USER, content=user_prompt)
-                    )
-
-                    # Run the orchestrator
-                    initial_state = {"messages": [msg.model_dump() for msg in memory.entries]}
-                    async for _ in orchestrator.run(initial_state):
-                        pass
-
-                asyncio.run(run_orchestrator())
+                # Run the orchestration logic
+                asyncio.run(run_orchestration(api_key, memory, user_prompt))
 
                 # Update UI
                 log_container.text("\n".join(log_messages))
