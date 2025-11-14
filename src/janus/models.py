@@ -1,0 +1,19 @@
+# src/janus/models.py
+from enum import Enum
+
+from pydantic import BaseModel
+
+
+class Role(str, Enum):
+    USER = "user"
+    ASSISTANT = "assistant"
+    SYSTEM = "system"
+
+
+class Message(BaseModel):
+    role: Role
+    content: str
+
+
+class WeatherArgs(BaseModel):
+    location: str
