@@ -5,7 +5,6 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from janus.agent import StandardPlannerAgent
-from janus.models import Message
 
 
 @pytest.fixture

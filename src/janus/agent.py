@@ -4,8 +4,7 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Any, Dict
 
-from janus.memory import BaseMemory
-from janus.models import Message
+from janus.models import Message, Role
 from janus.tool import ToolRegistry
 
 logger = logging.getLogger(__name__)
@@ -31,13 +30,15 @@ class StandardPlannerAgent(BaseAgent):
     A simple planner agent that uses a mock LLM to call tools.
     """
 
+    MOCK_LLM_RESPONSE = '{"tool_name": "get_weather", "parameters": {"location": "SF"}}'
+
     async def _mock_llm_call(self, prompt: str) -> str:
         """
         A mock LLM call that returns a hard-coded tool call.
         """
         logger.info(f"Mock LLM call with prompt:\n{prompt}")
         # In a real scenario, this would be a JSON object or similar
-        return '{"tool_name": "get_weather", "parameters": {"location": "SF"}}'
+        return self.MOCK_LLM_RESPONSE
 
     async def execute(
         self, state: Dict[str, Any], tools: "ToolRegistry"
@@ -68,13 +69,14 @@ What is the next step?
         try:
             tool_result = await tools.execute(tool_name, **parameters)
             new_message = Message(
-                role="assistant",
+                role=Role.ASSISTANT,
                 content=f"Tool {tool_name} executed successfully. Result: {tool_result}",
             )
         except Exception as e:
             logger.error(f"Tool execution failed: {e}")
             new_message = Message(
-                role="assistant", content=f"Error executing tool {tool_name}: {e}"
+                role=Role.ASSISTANT,
+                content=f"Error executing tool {tool_name}: {str(e)}",
             )
 
         # 5. Return new state

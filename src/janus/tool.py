@@ -33,6 +33,9 @@ class ToolRegistry:
     def register(self, tool_func: Callable[..., Coroutine[Any, Any, Any]]):
         """
         Registers a tool function.
+
+        Raises:
+            ValueError: If the tool is already registered.
         """
         tool_name = tool_func.__name__
         if tool_name in self._tools:
@@ -43,6 +46,9 @@ class ToolRegistry:
     async def execute(self, tool_name: str, **kwargs: Any) -> Any:
         """
         Executes a tool with the given arguments.
+
+        Raises:
+            ValueError: If the tool is not found.
         """
         if tool_name not in self._tools:
             raise ValueError(f"Tool '{tool_name}' not found.")

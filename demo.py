@@ -5,7 +5,7 @@ import logging
 
 from janus.agent import StandardPlannerAgent
 from janus.memory import InMemoryWorkingMemory
-from janus.models import WeatherArgs
+from janus.models import Role, WeatherArgs
 from janus.orchestrator import AsyncLocalOrchestrator
 from janus.tool import ToolRegistry, agent_tool
 
@@ -43,11 +43,23 @@ async def run_demo():
 
     # 4. Define initial state
     initial_state = {
-        "messages": [{"role": "user", "content": "What's the weather in SF?"}]
+        "messages": [{"role": Role.USER, "content": "What's the weather in SF?"}]
     }
 
     # 5. Run the orchestrator
-    final_state = await orchestrator.run(initial_state)
+    final_state = {}
+    async for state in orchestrator.run(initial_state):
+        final_state = state
+        # Simple termination condition for the demo
+        if "What's the weather" in initial_state.get("messages", [{}])[0].get(
+            "content", ""
+        ):
+            if any(
+                "Result: Sunny" in msg.get("content", "")
+                for msg in state.get("messages", [])
+            ):
+                logging.info("Demo condition met. Terminating.")
+                break
 
     # 6. Print the final state
     print("--- Final State ---")

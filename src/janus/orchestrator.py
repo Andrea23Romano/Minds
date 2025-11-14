@@ -27,7 +27,7 @@ class AsyncLocalOrchestrator:
 
     async def run(
         self, initial_state: Dict[str, Any], max_steps: int = 5
-    ) -> Dict[str, Any]:
+    ):
         """
         Runs the agentic graph.
         """
@@ -53,16 +53,7 @@ class AsyncLocalOrchestrator:
                 new_msg = Message(**agent_output["new_message"])
                 await self.memory.add(new_msg)
 
-            # Simple termination condition for the demo
-            if "What's the weather" in state.get("messages", [{}])[0].get(
-                "content", ""
-            ):
-                if any(
-                    "Result: Sunny" in msg.get("content", "")
-                    for msg in (await self.memory.get_context()).get("messages", [])
-                ):
-                    logger.info("Demo condition met. Terminating.")
-                    break
+            yield await self.memory.get_context()
+
 
         logger.info("Orchestration finished.")
-        return await self.memory.get_context()

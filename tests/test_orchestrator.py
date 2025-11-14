@@ -42,7 +42,9 @@ async def test_orchestrator_run(
     orchestrator: AsyncLocalOrchestrator, mock_agent, mock_memory
 ):
     initial_state = {"messages": [{"role": "user", "content": "Hello"}]}
-    final_state = await orchestrator.run(initial_state, max_steps=2)
+    final_state = {}
+    async for state in orchestrator.run(initial_state, max_steps=2):
+        final_state = state
 
     assert mock_agent.execute.call_count == 2
     assert mock_memory.add.call_count == 3  # 1 initial + 2 new
