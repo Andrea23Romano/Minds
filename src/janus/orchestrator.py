@@ -4,7 +4,7 @@ from typing import Any, Dict
 
 from janus.agent import BaseAgent
 from janus.memory import BaseMemory
-from janus.models import Message
+from janus.models import ChatMessage
 from janus.tool import ToolRegistry
 
 logger = logging.getLogger(__name__)
@@ -36,7 +36,7 @@ class AsyncLocalOrchestrator:
         # Add initial messages to memory
         if "messages" in state:
             for msg_data in state["messages"]:
-                await self.memory.add(Message(**msg_data))
+                await self.memory.add(ChatMessage(**msg_data))
 
         for step in range(max_steps):
             logger.info(f"Orchestrator Step {step + 1}/{max_steps}")
@@ -49,9 +49,9 @@ class AsyncLocalOrchestrator:
             agent_output = await self.agent.execute(current_state, self.tools)
 
             # Update state and memory
-            if "new_message" in agent_output:
-                new_msg = Message(**agent_output["new_message"])
-                await self.memory.add(new_msg)
+            if "messages_to_add" in agent_output:
+                for new_msg in agent_output["messages_to_add"]:
+                    await self.memory.add(new_msg)
 
             yield await self.memory.get_context()
 
