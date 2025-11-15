@@ -50,6 +50,9 @@ def test_get_schemas(tool_registry: ToolRegistry):
     schemas = tool_registry.get_schemas()
     assert len(schemas) == 1
     schema = schemas[0]
-    assert schema["name"] == "dummy_tool"
-    assert schema["description"] == "A dummy tool for testing."
-    assert "arg1" in schema["parameters"]["properties"]
+    assert schema["type"] == "function"
+    assert "function" in schema
+    function_spec = schema["function"]
+    assert function_spec["name"] == "dummy_tool"
+    assert function_spec["description"] == "A dummy tool for testing."
+    assert "arg1" in function_spec["parameters"]["properties"]
